@@ -1,0 +1,4 @@
+interface:
+  display_name: "imgod"
+  short_description: "Convert UI screenshots into Figma-pasteable captures"
+  default_prompt: "Use $imgod to convert this UI screenshot into a Figma-pasteable design capture."
