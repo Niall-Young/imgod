@@ -1,9 +1,21 @@
 (async () => {
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  const withTimeout = (promise, ms, label) => {
+    let timeout;
+    const timer = new Promise((_, reject) => {
+      timeout = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms.`)), ms);
+    });
+    return Promise.race([promise, timer]).finally(() => clearTimeout(timeout));
+  };
 
   // 1) 注入 capture.js
   if (!window.figma?.captureForDesign) {
-    const r = await fetch("https://mcp.figma.com/mcp/html-to-design/capture.js");
+    const controller = new AbortController();
+    const abort = setTimeout(() => controller.abort(), 15000);
+    const r = await fetch("https://mcp.figma.com/mcp/html-to-design/capture.js", {
+      signal: controller.signal
+    }).finally(() => clearTimeout(abort));
+    if (!r.ok) throw new Error(`Failed to load Figma capture.js: ${r.status}`);
     const s = await r.text();
     const el = document.createElement("script");
     el.textContent = s;
@@ -40,7 +52,11 @@
     ? "[data-figma-capture-root]"
     : "body";
 
-  return await window.figma.captureForDesign({
-    selector
-  });
+  return await withTimeout(
+    window.figma.captureForDesign({
+      selector
+    }),
+    40000,
+    "window.figma.captureForDesign"
+  );
 })();

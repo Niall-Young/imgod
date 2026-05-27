@@ -54,6 +54,29 @@ function parseViewport(value) {
   };
 }
 
+function originFromUrl(value) {
+  try {
+    return new URL(value).origin;
+  } catch {
+    throw new Error(`Invalid URL "${value}".`);
+  }
+}
+
+async function withTimeout(promise, ms, label) {
+  let timeout;
+  const timer = new Promise((_, reject) => {
+    timeout = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${ms}ms.`));
+    }, ms);
+  });
+
+  try {
+    return await Promise.race([promise, timer]);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function loadPlaywrightCore() {
   try {
     return await import("playwright-core");
@@ -81,20 +104,25 @@ if (!existsSync(scriptPath)) {
 
 const captureSource = readFileSync(scriptPath, "utf8");
 const viewport = parseViewport(args.viewport);
+const origin = originFromUrl(args.url);
 const { chromium } = await loadPlaywrightCore();
 
 const browser = await chromium.launch({
   channel: "chrome",
   headless: false,
 });
+let context;
 
 try {
-  const page = await browser.newPage({ viewport });
-  await page.goto(args.url, { waitUntil: "networkidle" });
-  await page.waitForLoadState("domcontentloaded");
-  await page.waitForFunction(() => document.body && document.body.children.length > 0);
+  context = await browser.newContext({ viewport });
+  await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin });
 
-  const payload = await page.evaluate(captureSource);
+  const page = await context.newPage();
+  await page.goto(args.url, { waitUntil: "domcontentloaded", timeout: 20000 });
+  await page.waitForFunction(() => document.body && document.body.children.length > 0, null, { timeout: 10000 });
+  await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
+
+  const payload = await withTimeout(page.evaluate(captureSource), 45000, "Figma capture");
   if (typeof payload !== "string" || !payload.startsWith("<span data-h2d=\"<!--(figh2d)")) {
     throw new Error("Capture did not return a Figma text/html payload.");
   }
@@ -102,5 +130,6 @@ try {
   writeFileSync(outPath, payload, "utf8");
   console.log(outPath);
 } finally {
+  if (context) await context.close().catch(() => {});
   await browser.close();
 }

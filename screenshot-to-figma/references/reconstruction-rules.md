@@ -54,7 +54,9 @@ Use this structure unless the screenshot requires a small adjustment:
 ## Image Assets
 - Asset:
   - Source: crop, user-supplied, or image2/image generation
+  - Final file:
   - Required size and treatment:
+  - Verification: visually inspected in the rendered app, transparent corners checked when applicable
 
 ## Implementation Notes
 - React structure:
@@ -76,6 +78,8 @@ After creating `design.md`, implement the React app from that spec. If the visua
 - Use real text and HTML controls instead of flattening UI to images.
 - Do not recreate logos, customer marks, badges, mascots, illustrations, photos, or product imagery as live DOM text. Create separate image assets and insert them with `<img>`.
 - Do not hand-draw brand marks, mascots, illustrations, thumbnails, product images, or brand-specific pictorial icons as rough SVG approximations. Crop/extract from the screenshot, use user-supplied assets, use image generation, or rasterize the extracted result into image assets instead.
+- For human/character portraits, mascots, IP, photos, illustrations, product imagery, screenshots, project thumbnails, and hero artwork, never use hand-authored SVG/Canvas/CSS shapes as the source, even if the result is rasterized to PNG/WebP. That produces a placeholder, not the requested visual asset.
+- If image generation is used, the final React asset must be the selected generated bitmap or a direct crop/post-process of it. Do not create a script that later overwrites the same filename with an approximate SVG-generated PNG.
 - Give fixed-format UI elements stable dimensions with `width`, `height`, `aspect-ratio`, grid tracks, or `min/max` constraints so states do not cause layout shift.
 - Avoid placeholder rectangles. If the screenshot contains visual content and no source asset is available, generate or approximate the asset.
 - Keep generated React code local and deterministic enough that browser capture works from the dev server without remote runtime dependencies besides installed npm packages.
@@ -182,6 +186,60 @@ For missing illustrations or photos:
 
 Save generated assets in the React project `assets/` directory, use descriptive filenames, and embed them with `<img>` tags. For transparent mascots, prefer PNG/WebP with alpha and validate that corners are transparent.
 
+### Image Generation Persistence
+
+The generated bitmap must become a real project file before any React implementation or capture is considered complete. A chat-visible image is not enough.
+
+Required sequence for each generated image asset:
+
+1. Create a marker immediately before invoking image generation:
+   ```bash
+   mkdir -p /path/to/react-project/tmp/imagegen
+   touch /path/to/react-project/tmp/imagegen/hero-portrait.before
+   ```
+2. Invoke the image generation tool using the prompt recorded in `design.md`.
+3. Persist the newest generated file into the React project:
+   ```bash
+   node /path/to/img-to-figma/scripts/persist_imagegen_asset.mjs \
+     --since /path/to/react-project/tmp/imagegen/hero-portrait.before \
+     --out /path/to/react-project/public/assets/hero-portrait.png
+   ```
+4. Validate the persisted file:
+   ```bash
+   file /path/to/react-project/public/assets/hero-portrait.png
+   sips -g pixelWidth -g pixelHeight -g hasAlpha /path/to/react-project/public/assets/hero-portrait.png
+   ```
+5. Visually inspect the exact project file and the rendered page. The project file must show the intended generated/cropped subject, not an approximation with the same filename.
+6. Record the final file path and source type in `design.md`.
+
+If `persist_imagegen_asset.mjs` cannot find a new generated image under `$CODEX_HOME/generated_images`, manually inspect `$CODEX_HOME/generated_images` by mtime once. If there is still no reusable file, stop before capture and report that the image generation output could not be persisted. Do not create a local SVG/Canvas/CSS stand-in just to keep moving. Use a user-supplied file or explicit CLI fallback only after the user agrees.
+
+## Asset Provenance and Audit
+
+For every non-generic image in the React app, `design.md` must record the final file path and source type. This is not optional for hero artwork, portraits, mascots, illustrations, photos, product imagery, screenshots, or project thumbnails.
+
+Allowed source types:
+
+- Screenshot crop or cutout from the user-provided image.
+- User-supplied local file.
+- Image generation output, optionally post-processed for transparency, crop, color, or size.
+- Deterministic generation only for simple logos, abstract marks, geometric badges, generic icons, and background textures.
+
+Hard failure conditions:
+
+- A complex visual asset is created by `sharp`, Canvas, CSS, or SVG path code from scratch instead of using crop/user-supplied/image-generated bitmap input.
+- A script writes a file such as `hero-portrait.png`, `avatar.png`, `mascot.png`, `illustration.png`, `product.png`, `thumbnail.png`, or `project-*.png` from a hand-authored SVG body.
+- An image generation output was shown in the conversation but was not copied into the React project and verified as the file referenced by `<img>`.
+- The rendered page references a filename that differs from the verified generated/cropped bitmap.
+
+Before capture, run the audit helper from the React project context:
+
+```bash
+node /path/to/img-to-figma/scripts/audit_visual_assets.mjs /path/to/react-project
+```
+
+Then visually inspect every hero/portrait/mascot/product/thumbnail image in the rendered page. The audit helper catches common script-based placeholder regressions; visual inspection is still required because a valid PNG can contain the wrong subject.
+
 ## Logo and Brand Mark Rules
 
 - Logos and customer marks are image assets. Never leave them as editable page text, even if the mark is word-only.
@@ -203,6 +261,7 @@ Before capture:
 - Take or inspect a rendered screenshot and compare it against the original.
 - Check that text does not overflow controls and that hover/active/disabled states do not shift layout.
 - Confirm images load, fonts are ready, SVG icons render, and no visible broken assets remain.
+- Confirm each hero/portrait/mascot/product/thumbnail image is the intended generated/cropped bitmap, not a same-named placeholder produced by a local asset script.
 - Confirm dark or colored backgrounds are visible as solid fills, not just transparent gradient overlays. Inspect root and section CSS if the screenshot has a non-white background.
 - Scroll through long pages once to trigger lazy content before running capture.
 - The Codex in-app browser is acceptable for visual verification, but do not use its `evaluate` surface for Figma capture because it can be read-only and block script injection.
