@@ -2,7 +2,7 @@
 
 ## Screenshot Analysis Checklist
 
-Capture these facts before writing HTML:
+Capture these facts in `design.md` before writing React code:
 
 - Canvas and viewport: screenshot dimensions, likely device class, scroll state, safe areas, and background treatment.
 - Layout: main regions, grids, columns, alignment anchors, spacing rhythm, content density, and fixed or sticky areas.
@@ -12,10 +12,62 @@ Capture these facts before writing HTML:
 - Assets: photos, illustrations, thumbnails, logos, mascots/IP, icons, avatars, and background textures.
 - Interactions: hover affordances, selected state, active/click feedback, disabled styling, focus rings, expanded/collapsed state, and scroll-triggered behavior.
 
-## HTML Reconstruction Rules
+## design.md Requirements
 
-- Create one standalone HTML file per screenshot unless the user asks for multiple pages.
-- Prefer semantic HTML with inline CSS in a `<style>` tag and minimal vanilla JS in a `<script>` tag.
+Create `design.md` as the first artifact. It is the implementation contract for the React reconstruction, not a loose note.
+
+Use this structure unless the screenshot requires a small adjustment:
+
+```markdown
+# Design Spec
+
+## Canvas
+- Size:
+- Device/viewport:
+- Background:
+
+## Layout
+- Regions:
+- Grid/columns:
+- Spacing rhythm:
+- Fixed/sticky areas:
+
+## Visual System
+- Colors:
+- Typography:
+- Radius/borders/shadows:
+- Effects:
+
+## Components
+- Component:
+  - Structure:
+  - States:
+  - Measurements:
+  - Text:
+
+## Icons
+- Screenshot glyph:
+  - Hugeicons icon:
+  - Size/stroke/color:
+
+## Image Assets
+- Asset:
+  - Source: crop, user-supplied, or image2/image generation
+  - Required size and treatment:
+
+## Implementation Notes
+- React structure:
+- Known approximations:
+```
+
+After creating `design.md`, implement the React app from that spec. If the visual implementation changes during verification, update `design.md` so it remains accurate.
+
+## React Reconstruction Rules
+
+- Create a Vite React app per screenshot unless the user asks for multiple screens or an existing project integration.
+- Use JavaScript JSX by default. The usual minimum files are `package.json`, `index.html`, `src/main.jsx`, `src/App.jsx`, `src/styles.css`, and `assets/`.
+- Install and use `react`, `react-dom`, `vite`, `@vitejs/plugin-react`, `@hugeicons/react`, and `@hugeicons/core-free-icons`.
+- Start the dev server and capture the rendered React page through `http://127.0.0.1:...` or `http://localhost:...`, not `file://`.
 - Match the screenshot first; avoid adding explanatory text, onboarding copy, or controls that are not visible or implied.
 - Treat the screenshot as the default and only source of truth. Do not browse the original site, fetch production assets, or use external brand files unless the user explicitly provides or requests those sources.
 - Use CSS variables for repeated colors, radii, shadows, and spacing when it helps keep the page coherent.
@@ -24,11 +76,11 @@ Capture these facts before writing HTML:
 - Do not hand-draw brand marks, mascots, illustrations, thumbnails, product images, or brand-specific pictorial icons as rough SVG approximations. Crop/extract from the screenshot, use user-supplied assets, use image generation, or rasterize the extracted result into image assets instead.
 - Give fixed-format UI elements stable dimensions with `width`, `height`, `aspect-ratio`, grid tracks, or `min/max` constraints so states do not cause layout shift.
 - Avoid placeholder rectangles. If the screenshot contains visual content and no source asset is available, generate or approximate the asset.
-- Keep generated pages local and self-contained enough that browser capture works without a framework dev server when possible.
+- Keep generated React code local and deterministic enough that browser capture works from the dev server without remote runtime dependencies besides installed npm packages.
 
 ## Component State Requirements
 
-Implement stateful components with CSS and small JS where needed:
+Implement stateful components with React state and CSS where needed:
 
 - Buttons and icon buttons: default, `:hover`, `:active`, `:focus-visible`, and `[disabled]`.
 - Inputs and textareas: default, hover/focus, filled, invalid if visible, placeholder, and disabled.
@@ -42,8 +94,17 @@ Use `data-state`, `aria-selected`, `aria-expanded`, `aria-disabled`, or native a
 ## Hugeicons Rules
 
 - Use Hugeicons as the default icon source: https://hugeicons.com/ and https://docs.hugeicons.com/.
-- Use inline SVG icons copied from Hugeicons documentation or package output so the HTML remains portable.
-- Every icon instance must contain its full SVG geometry directly in place, for example `<svg ...><path ...></path></svg>`.
+- In React, import the renderer from `@hugeicons/react` and free icon definitions from `@hugeicons/core-free-icons`.
+- Use `HugeiconsIcon` for each generic UI icon:
+
+```jsx
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Home01Icon } from "@hugeicons/core-free-icons";
+
+<HugeiconsIcon icon={Home01Icon} size={24} color="currentColor" strokeWidth={1.5} />
+```
+
+- Do not hand-inline Hugeicons SVG in JSX as the default path.
 - Do not use `<symbol>`, `<use href="#...">`, SVG sprites, icon fonts, web components, external icon scripts, or CDN-only references. Figma html-to-design often cannot resolve them and imports empty icon boxes.
 - Match icon size, stroke width, cap/join style, and optical alignment to the screenshot.
 - If an exact icon is unavailable, choose the nearest semantic and visual match from Hugeicons.
@@ -52,7 +113,7 @@ Use `data-state`, `aria-selected`, `aria-expanded`, `aria-disabled`, or native a
 
 ## Image Generation Rules
 
-Use image2/image generation when the screenshot includes an asset that is not supplied as a cutout or extractable image.
+Use image2/image generation when the screenshot includes an IP character, visual illustration, product image, mascot, or other asset that is not supplied as a cutout or extractable image.
 
 Required prompt core from the skill owner:
 
@@ -63,7 +124,7 @@ Required prompt core from the skill owner:
 For mascots/IP characters, extend the prompt:
 
 ```text
-界面上的吉祥物 IP 保留为单独的透明底图片，替换进 HTML 页面；保持吉祥物动作、姿态、表情、比例、风格、光照和边缘处理的一致性。
+界面上的吉祥物 IP 保留为单独的透明底图片，替换进 React 页面；保持吉祥物动作、姿态、表情、比例、风格、光照和边缘处理的一致性。
 ```
 
 For missing illustrations or photos:
@@ -72,12 +133,12 @@ For missing illustrations or photos:
 当没有切图时，使用 image2 图片生成器生成对应的图片内容，例如吉祥物、IP、视觉插画等；保持与截图一致的风格、色彩、透视、光照和精细度，不添加截图中没有的文字。
 ```
 
-Save generated assets beside the HTML, use descriptive filenames, and embed them with `<img>` tags. For transparent mascots, prefer PNG/WebP with alpha and validate that corners are transparent.
+Save generated assets in the React project `assets/` directory, use descriptive filenames, and embed them with `<img>` tags. For transparent mascots, prefer PNG/WebP with alpha and validate that corners are transparent.
 
 ## Logo and Brand Mark Rules
 
 - Logos and customer marks are image assets. Never leave them as editable page text, even if the mark is word-only.
-- If a supplied or extracted logo source is SVG with embedded fonts, `<text>`, complex paths, or effects that Figma capture may split into poor layers, rasterize it to a transparent PNG/WebP and use that bitmap in the HTML.
+- If a supplied or extracted logo source is SVG with embedded fonts, `<text>`, complex paths, or effects that Figma capture may split into poor layers, rasterize it to a transparent PNG/WebP and use that bitmap in React.
 - Priority order:
   1. Use a supplied original logo/cutout if the user provides one.
   2. Crop or extract the mark from the screenshot when the resolution is sufficient.
@@ -85,13 +146,13 @@ Save generated assets beside the HTML, use descriptive filenames, and embed them
 - Insert each mark with `<img src="...">` and fixed dimensions that match the screenshot.
 - Keep transparent backgrounds unless the screenshot shows a filled logo tile.
 - If the exact trademark asset cannot be recovered, report that the logo is a visually matched approximation.
-- Do not use HTML text styled with CSS as the final logo implementation; Figma will import it as text, not as a logo asset.
+- Do not use DOM text styled with CSS as the final logo implementation; Figma will import it as text, not as a logo asset.
 
 ## Browser Verification
 
 Before capture:
 
-- Open the HTML at the screenshot's approximate viewport size.
+- Open the React app at the screenshot's approximate viewport size.
 - Take or inspect a rendered screenshot and compare it against the original.
 - Check that text does not overflow controls and that hover/active/disabled states do not shift layout.
 - Confirm images load, fonts are ready, SVG icons render, and no visible broken assets remain.
@@ -103,8 +164,9 @@ Before capture:
 - Keep `selector: "body"` by default.
 - Treat the capture result as an HTML clipboard payload, not readable user text.
 - The payload should begin with `<span data-h2d="<!--(figh2d)` and must be copied to Figma as MIME type `text/html`.
-- Save the payload as `figma-capture.txt` next to the HTML for traceability.
+- Save the payload as `figma-capture.txt` next to the React project for traceability only.
 - Do not tell users to manually select/copy the visible contents of `figma-capture.txt`; that produces a giant text layer in Figma.
 - On macOS, prefer `swift scripts/copy_figma_payload_to_clipboard.swift <figma-capture.txt>` and verify `clipboard info` includes `«class HTML»`.
 - If browser clipboard copy is needed, open a helper page through `http://127.0.0.1`, not `file://`; `file://` pages often fail or degrade clipboard writes.
+- The final user-facing copy route is clipboard-first: say the Figma `text/html` payload is already on the clipboard and can be pasted into Figma. Only provide a paste helper URL if direct clipboard write fails.
 - Report any remaining mismatch honestly, such as unavailable exact font, inferred hidden state, or generated image differences.
